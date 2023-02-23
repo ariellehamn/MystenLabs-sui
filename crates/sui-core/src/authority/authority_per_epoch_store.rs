@@ -40,7 +40,8 @@ use crate::checkpoints::{
     PendingCheckpointInfo,
 };
 use crate::consensus_handler::{
-    SequencedConsensusTransaction, VerifiedSequencedConsensusTransaction,
+    SequencedConsensusTransaction, SequencedConsensusTransactionKey,
+    SequencedConsensusTransactionKind, VerifiedSequencedConsensusTransaction,
 };
 use crate::epoch::epoch_metrics::EpochMetrics;
 use crate::epoch::reconfiguration::ReconfigState;
@@ -92,7 +93,7 @@ pub struct AuthorityPerEpochStore {
 
     /// In-memory cache of the content from the reconfig_state db table.
     reconfig_state_mem: RwLock<ReconfigState>,
-    consensus_notify_read: NotifyRead<ConsensusTransactionKey, ()>,
+    consensus_notify_read: NotifyRead<SequencedConsensusTransactionKey, ()>,
 
     pub(crate) checkpoint_state_notify_read: NotifyRead<CheckpointSequenceNumber, Accumulator>,
 
@@ -179,7 +180,7 @@ pub struct AuthorityEpochTables {
     /// Entries in this table can be garbage collected whenever we can prove that we won't receive
     /// another handle_consensus_transaction call for the given digest. This probably means at
     /// epoch change.
-    consensus_message_processed: DBMap<ConsensusTransactionKey, bool>,
+    consensus_message_processed: DBMap<SequencedConsensusTransactionKey, bool>,
 
     /// Map stores pending transactions that this authority submitted to consensus
     pending_consensus_transactions: DBMap<ConsensusTransactionKey, ConsensusTransaction>,
@@ -923,12 +924,15 @@ impl AuthorityPerEpochStore {
         &self,
         certificate: &CertifiedTransaction,
     ) -> SuiResult<bool> {
-        self.is_consensus_message_processed(&ConsensusTransactionKey::Certificate(
-            *certificate.digest(),
+        self.is_consensus_message_processed(&SequencedConsensusTransactionKey::External(
+            ConsensusTransactionKey::Certificate(*certificate.digest()),
         ))
     }
 
-    pub fn is_consensus_message_processed(&self, key: &ConsensusTransactionKey) -> SuiResult<bool> {
+    pub fn is_consensus_message_processed(
+        &self,
+        key: &SequencedConsensusTransactionKey,
+    ) -> SuiResult<bool> {
         Ok(self.tables.consensus_message_processed.contains_key(key)?)
     }
 
@@ -936,6 +940,7 @@ impl AuthorityPerEpochStore {
         &self,
         key: ConsensusTransactionKey,
     ) -> Result<(), SuiError> {
+        let key = SequencedConsensusTransactionKey::External(key);
         let registration = self.consensus_notify_read.register_one(&key);
         if self.is_consensus_message_processed(&key)? {
             return Ok(());
@@ -1006,7 +1011,7 @@ impl AuthorityPerEpochStore {
     pub fn record_end_of_publish(
         &self,
         authority: AuthorityName,
-        key: ConsensusTransactionKey,
+        key: SequencedConsensusTransactionKey,
         consensus_index: ExecutionIndicesWithHash,
     ) -> SuiResult {
         let mut write_batch = self.tables.last_consensus_index.batch();
@@ -1056,7 +1061,7 @@ impl AuthorityPerEpochStore {
     /// Caller is responsible to call consensus_message_processed before this method
     pub async fn record_owned_object_cert_from_consensus(
         &self,
-        transaction: &ConsensusTransaction,
+        transaction: &SequencedConsensusTransactionKind,
         certificate: &VerifiedExecutableTransaction,
         consensus_index: ExecutionIndicesWithHash,
     ) -> Result<(), SuiError> {
@@ -1071,7 +1076,7 @@ impl AuthorityPerEpochStore {
     /// Caller is responsible to call consensus_message_processed before this method
     pub async fn record_shared_object_cert_from_consensus(
         &self,
-        transaction: &ConsensusTransaction,
+        transaction: &SequencedConsensusTransactionKind,
         certificate: &VerifiedExecutableTransaction,
         consensus_index: ExecutionIndicesWithHash,
         parent_sync_store: impl ParentSync,
@@ -1134,11 +1139,11 @@ impl AuthorityPerEpochStore {
 
     pub fn record_consensus_transaction_processed(
         &self,
-        transaction: &ConsensusTransaction,
+        transaction: &SequencedConsensusTransactionKind,
         consensus_index: ExecutionIndicesWithHash,
     ) -> Result<(), SuiError> {
-        // user certificates need to use record_(shared|owned)_object_cert_from_consensus
-        assert!(!transaction.is_user_certificate());
+        // executable transactions need to use record_(shared|owned)_object_cert_from_consensus
+        assert!(!transaction.is_executable_transaction());
         let key = transaction.key();
         let write_batch = self.tables.last_consensus_index.batch();
         self.finish_consensus_transaction_process_with_batch(write_batch, key, consensus_index)
@@ -1210,7 +1215,7 @@ impl AuthorityPerEpochStore {
 
     pub fn finish_consensus_certificate_process(
         &self,
-        key: ConsensusTransactionKey,
+        key: SequencedConsensusTransactionKey,
         certificate: &VerifiedExecutableTransaction,
         consensus_index: ExecutionIndicesWithHash,
     ) -> SuiResult {
@@ -1225,7 +1230,7 @@ impl AuthorityPerEpochStore {
 
     pub fn finish_assign_shared_object_versions(
         &self,
-        key: ConsensusTransactionKey,
+        key: SequencedConsensusTransactionKey,
         certificate: &VerifiedExecutableTransaction,
         consensus_index: ExecutionIndicesWithHash,
         assigned_versions: Vec<(ObjectID, SequenceNumber)>,
@@ -1267,7 +1272,7 @@ impl AuthorityPerEpochStore {
     fn finish_consensus_transaction_process_with_batch(
         &self,
         batch: DBBatch,
-        key: ConsensusTransactionKey,
+        key: SequencedConsensusTransactionKey,
         consensus_index: ExecutionIndicesWithHash,
     ) -> SuiResult {
         let batch = batch.insert_batch(
@@ -1290,6 +1295,7 @@ impl AuthorityPerEpochStore {
             .insert(&digest, &signatures)
             .unwrap();
         let key = ConsensusTransactionKey::Certificate(digest);
+        let key = SequencedConsensusTransactionKey::External(key);
         self.tables
             .consensus_message_processed
             .insert(&key, &true)
@@ -1300,7 +1306,7 @@ impl AuthorityPerEpochStore {
     fn finish_consensus_certificate_process_with_batch(
         &self,
         batch: DBBatch,
-        key: ConsensusTransactionKey,
+        key: SequencedConsensusTransactionKey,
         certificate: &VerifiedExecutableTransaction,
         consensus_index: ExecutionIndicesWithHash,
     ) -> SuiResult {
@@ -1467,22 +1473,31 @@ impl AuthorityPerEpochStore {
         {
             debug!(
                 consensus_index=?transaction.consensus_index.index.transaction_index,
-                tracking_id=?transaction.transaction.tracking_id,
+                tracking_id=?transaction.transaction.get_tracking_id(),
                 "handle_consensus_transaction UserTransaction [skip]",
             );
             skipped_consensus_txns.inc();
             return Err(());
         }
         // Signatures are verified as part of narwhal payload verification in SuiTxValidator
-        match &transaction.transaction.kind {
-            ConsensusTransactionKind::UserTransaction(_certificate) => {}
-            ConsensusTransactionKind::CheckpointSignature(data) => {
+        match &transaction.transaction {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::UserTransaction(_certificate),
+                ..
+            }) => {}
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::CheckpointSignature(data),
+                ..
+            }) => {
                 if transaction.sender_authority() != data.summary.auth_signature.authority {
                     warn!("CheckpointSignature authority {} does not match narwhal certificate source {}", data.summary.auth_signature.authority, transaction.certificate.origin() );
                     return Err(());
                 }
             }
-            ConsensusTransactionKind::EndOfPublish(authority) => {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::EndOfPublish(authority),
+                ..
+            }) => {
                 if &transaction.sender_authority() != authority {
                     warn!(
                         "EndOfPublish authority {} does not match narwhal certificate source {}",
@@ -1492,7 +1507,10 @@ impl AuthorityPerEpochStore {
                     return Err(());
                 }
             }
-            ConsensusTransactionKind::CapabilityNotification(capabilities) => {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::CapabilityNotification(capabilities),
+                ..
+            }) => {
                 if transaction.sender_authority() != capabilities.authority {
                     warn!(
                         "CapabilityNotification authority {} does not match narwhal certificate source {}",
@@ -1502,6 +1520,7 @@ impl AuthorityPerEpochStore {
                     return Err(());
                 }
             }
+            SequencedConsensusTransactionKind::System(_) => {}
         }
         Ok(VerifiedSequencedConsensusTransaction(transaction))
     }
@@ -1544,8 +1563,11 @@ impl AuthorityPerEpochStore {
             transaction,
         }) = transaction;
         let tracking_id = transaction.get_tracking_id();
-        match &transaction.kind {
-            ConsensusTransactionKind::UserTransaction(certificate) => {
+        match &transaction {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::UserTransaction(certificate),
+                ..
+            }) => {
                 if certificate.epoch() != self.epoch() {
                     // Epoch has changed after this certificate was sequenced, ignore it.
                     debug!(
@@ -1603,17 +1625,26 @@ impl AuthorityPerEpochStore {
 
                 Ok(Some(certificate))
             }
-            ConsensusTransactionKind::CheckpointSignature(info) => {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::CheckpointSignature(info),
+                ..
+            }) => {
                 checkpoint_service.notify_checkpoint_signature(self, info)?;
                 self.record_consensus_transaction_processed(&transaction, consensus_index)?;
                 Ok(None)
             }
-            ConsensusTransactionKind::EndOfPublish(authority) => {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::EndOfPublish(authority),
+                ..
+            }) => {
                 debug!("Received EndOfPublish from {:?}", authority.concise());
                 self.record_end_of_publish(*authority, transaction.key(), consensus_index)?;
                 Ok(None)
             }
-            ConsensusTransactionKind::CapabilityNotification(capabilities) => {
+            SequencedConsensusTransactionKind::External(ConsensusTransaction {
+                kind: ConsensusTransactionKind::CapabilityNotification(capabilities),
+                ..
+            }) => {
                 let authority = capabilities.authority;
                 if self
                     .get_reconfig_state_read_lock_guard()
@@ -1631,6 +1662,30 @@ impl AuthorityPerEpochStore {
                     );
                 }
                 Ok(None)
+            }
+            SequencedConsensusTransactionKind::System(system_transaction) => {
+                if !self
+                    .get_reconfig_state_read_lock_guard()
+                    .should_accept_consensus_certs()
+                {
+                    debug!(
+                        "Ignoring system transaction {:?} because of end of epoch",
+                        system_transaction.digest()
+                    );
+                    return Ok(None);
+                }
+
+                // If needed we can support owned object system transactions as well...
+                assert!(system_transaction.contains_shared_object());
+                self.record_shared_object_cert_from_consensus(
+                    &transaction,
+                    system_transaction,
+                    consensus_index,
+                    parent_sync_store,
+                )
+                .await?;
+
+                Ok(Some(system_transaction.clone()))
             }
         }
     }

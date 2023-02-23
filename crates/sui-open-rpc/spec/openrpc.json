@@ -5671,10 +5671,22 @@
       "SuiConsensusCommitPrologue": {
         "type": "object",
         "required": [
-          "checkpoint_start_timestamp_ms"
+          "commit_timestamp_ms",
+          "epoch",
+          "round"
         ],
         "properties": {
-          "checkpoint_start_timestamp_ms": {
+          "commit_timestamp_ms": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "epoch": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
+          "round": {
             "type": "integer",
             "format": "uint64",
             "minimum": 0.0

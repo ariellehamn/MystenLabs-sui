@@ -1606,7 +1606,9 @@ pub struct SuiGenesisTransaction {
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SuiConsensusCommitPrologue {
-    pub checkpoint_start_timestamp_ms: u64,
+    pub epoch: u64,
+    pub round: u64,
+    pub commit_timestamp_ms: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -1725,7 +1727,11 @@ impl Display for SuiTransactionKind {
             }
             Self::ConsensusCommitPrologue(p) => {
                 writeln!(writer, "Transaction Kind : Consensus Commit Prologue")?;
-                writeln!(writer, "Timestamp : {}", p.checkpoint_start_timestamp_ms)?;
+                writeln!(
+                    writer,
+                    "Epoch: {}, Round: {}, Timestamp : {}",
+                    p.epoch, p.round, p.commit_timestamp_ms
+                )?;
             }
         }
         write!(f, "{}", writer)
@@ -1788,7 +1794,9 @@ impl TryFrom<SingleTransactionKind> for SuiTransactionKind {
             }),
             SingleTransactionKind::ConsensusCommitPrologue(p) => {
                 Self::ConsensusCommitPrologue(SuiConsensusCommitPrologue {
-                    checkpoint_start_timestamp_ms: p.checkpoint_start_timestamp_ms,
+                    epoch: p.epoch,
+                    round: p.round,
+                    commit_timestamp_ms: p.commit_timestamp_ms,
                 })
             }
             SingleTransactionKind::ProgrammableTransaction(_) => {
