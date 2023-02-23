@@ -404,6 +404,19 @@ module sui::sui_system {
         vec_set::remove(reporters, &sender);
     }
 
+    /// Update an validator's network address.
+    /// The change will only take effects starting from the next epoch.
+    public entry fun update_network_address(
+        self: &mut SuiSystemState,
+        network_address: vector<u8>,
+        ctx: &TxContext,
+    ) {
+        let sender = tx_context::sender(ctx);
+        if (validator_set::is_active_validator(&self.validators, sender)) {
+            validator_set::update_network_address(&mut self.validators, network_address, ctx);
+        }
+    }
+
     /// This function should be called at the end of an epoch, and advances the system to the next epoch.
     /// It does the following things:
     /// 1. Add storage charge to the storage fund.
@@ -645,6 +658,16 @@ module sui::sui_system {
     /// Return the current validator set
     public fun validators(self: &SuiSystemState): &ValidatorSet {
         &self.validators
+    }
+
+    /// Return the currently active validator by address
+    public fun active_validator_by_address(self: &SuiSystemState, validator_address: address): &Validator {
+        validator_set::get_active_validator_ref(&self.validators, validator_address)
+    }
+
+    /// Return the currently pending validator by address
+    public fun pending_validator_by_address(self: &SuiSystemState, validator_address: address): &Validator {
+        validator_set::get_pending_validator_ref(&self.validators, validator_address)
     }
 
     #[test_only]

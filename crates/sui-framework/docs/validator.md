@@ -24,6 +24,7 @@
 -  [Function `get_staking_pool_mut_ref`](#0x2_validator_get_staking_pool_mut_ref)
 -  [Function `metadata`](#0x2_validator_metadata)
 -  [Function `sui_address`](#0x2_validator_sui_address)
+-  [Function `network_address`](#0x2_validator_network_address)
 -  [Function `total_stake_amount`](#0x2_validator_total_stake_amount)
 -  [Function `stake_amount`](#0x2_validator_stake_amount)
 -  [Function `delegate_amount`](#0x2_validator_delegate_amount)
@@ -36,6 +37,7 @@
 -  [Function `commission_rate`](#0x2_validator_commission_rate)
 -  [Function `pool_token_exchange_rate`](#0x2_validator_pool_token_exchange_rate)
 -  [Function `is_duplicate`](#0x2_validator_is_duplicate)
+-  [Function `update_network_address`](#0x2_validator_update_network_address)
 
 
 <pre><code><b>use</b> <a href="">0x1::ascii</a>;
@@ -787,6 +789,30 @@ Called by <code><a href="validator_set.md#0x2_validator_set">validator_set</a></
 
 </details>
 
+<a name="0x2_validator_network_address"></a>
+
+## Function `network_address`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="validator.md#0x2_validator_network_address">network_address</a>(self: &<a href="validator.md#0x2_validator_Validator">validator::Validator</a>): <a href="">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="validator.md#0x2_validator_network_address">network_address</a>(self: &<a href="validator.md#0x2_validator_Validator">Validator</a>): <a href="">vector</a>&lt;u8&gt; {
+    self.metadata.net_address
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x2_validator_total_stake_amount"></a>
 
 ## Function `total_stake_amount`
@@ -1090,6 +1116,31 @@ Set the voting power of this validator, called only from validator_set.
         || self.metadata.name == other.metadata.name
         || self.metadata.net_address == other.metadata.net_address
         || self.metadata.pubkey_bytes == other.metadata.pubkey_bytes
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x2_validator_update_network_address"></a>
+
+## Function `update_network_address`
+
+Update network address of this validator, called only from validator_set
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x2_validator_update_network_address">update_network_address</a>(self: &<b>mut</b> <a href="validator.md#0x2_validator_Validator">validator::Validator</a>, net_address: <a href="">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="validator.md#0x2_validator_update_network_address">update_network_address</a>(self: &<b>mut</b> <a href="validator.md#0x2_validator_Validator">Validator</a>, net_address: <a href="">vector</a>&lt;u8&gt;) {
+    self.metadata.net_address = net_address;
 }
 </code></pre>
 

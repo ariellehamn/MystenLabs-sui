@@ -24,6 +24,7 @@
 -  [Function `request_withdraw_delegation`](#0x2_sui_system_request_withdraw_delegation)
 -  [Function `report_validator`](#0x2_sui_system_report_validator)
 -  [Function `undo_report_validator`](#0x2_sui_system_undo_report_validator)
+-  [Function `update_network_address`](#0x2_sui_system_update_network_address)
 -  [Function `advance_epoch`](#0x2_sui_system_advance_epoch)
 -  [Function `advance_epoch_safe_mode`](#0x2_sui_system_advance_epoch_safe_mode)
 -  [Function `consensus_commit_prologue`](#0x2_sui_system_consensus_commit_prologue)
@@ -35,6 +36,8 @@
 -  [Function `extract_coin_balance`](#0x2_sui_system_extract_coin_balance)
 -  [Function `extract_locked_coin_balance`](#0x2_sui_system_extract_locked_coin_balance)
 -  [Function `validators`](#0x2_sui_system_validators)
+-  [Function `active_validator_by_address`](#0x2_sui_system_active_validator_by_address)
+-  [Function `pending_validator_by_address`](#0x2_sui_system_pending_validator_by_address)
 
 
 <pre><code><b>use</b> <a href="">0x1::option</a>;
@@ -950,6 +953,36 @@ Undo a <code>report_validator</code> action. Aborts if the sender has not report
 
 </details>
 
+<a name="0x2_sui_system_update_network_address"></a>
+
+## Function `update_network_address`
+
+Update an validator's network address.
+The change will only take effects starting from the next epoch.
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="sui_system.md#0x2_sui_system_update_network_address">update_network_address</a>(self: &<b>mut</b> <a href="sui_system.md#0x2_sui_system_SuiSystemState">sui_system::SuiSystemState</a>, network_address: <a href="">vector</a>&lt;u8&gt;, ctx: &<a href="tx_context.md#0x2_tx_context_TxContext">tx_context::TxContext</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> entry <b>fun</b> <a href="sui_system.md#0x2_sui_system_update_network_address">update_network_address</a>(
+    self: &<b>mut</b> <a href="sui_system.md#0x2_sui_system_SuiSystemState">SuiSystemState</a>,
+    network_address: <a href="">vector</a>&lt;u8&gt;,
+    ctx: &TxContext,
+) {
+    <a href="validator_set.md#0x2_validator_set_update_network_address">validator_set::update_network_address</a>(&<b>mut</b> self.validators, network_address, ctx);
+}
+</code></pre>
+
+
+
+</details>
+
 <a name="0x2_sui_system_advance_epoch"></a>
 
 ## Function `advance_epoch`
@@ -1406,6 +1439,56 @@ Return the current validator set
 
 <pre><code><b>public</b> <b>fun</b> <a href="sui_system.md#0x2_sui_system_validators">validators</a>(self: &<a href="sui_system.md#0x2_sui_system_SuiSystemState">SuiSystemState</a>): &ValidatorSet {
     &self.validators
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x2_sui_system_active_validator_by_address"></a>
+
+## Function `active_validator_by_address`
+
+Return the currently active validator by address
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sui_system.md#0x2_sui_system_active_validator_by_address">active_validator_by_address</a>(self: &<a href="sui_system.md#0x2_sui_system_SuiSystemState">sui_system::SuiSystemState</a>, validator_address: <b>address</b>): &<a href="validator.md#0x2_validator_Validator">validator::Validator</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sui_system.md#0x2_sui_system_active_validator_by_address">active_validator_by_address</a>(self: &<a href="sui_system.md#0x2_sui_system_SuiSystemState">SuiSystemState</a>, validator_address: <b>address</b>): &Validator {
+    <a href="validator_set.md#0x2_validator_set_get_active_validator_ref">validator_set::get_active_validator_ref</a>(&self.validators, validator_address)
+}
+</code></pre>
+
+
+
+</details>
+
+<a name="0x2_sui_system_pending_validator_by_address"></a>
+
+## Function `pending_validator_by_address`
+
+Return the currently pending validator by address
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sui_system.md#0x2_sui_system_pending_validator_by_address">pending_validator_by_address</a>(self: &<a href="sui_system.md#0x2_sui_system_SuiSystemState">sui_system::SuiSystemState</a>, validator_address: <b>address</b>): &<a href="validator.md#0x2_validator_Validator">validator::Validator</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="sui_system.md#0x2_sui_system_pending_validator_by_address">pending_validator_by_address</a>(self: &<a href="sui_system.md#0x2_sui_system_SuiSystemState">SuiSystemState</a>, validator_address: <b>address</b>): &Validator {
+    <a href="validator_set.md#0x2_validator_set_get_pending_validator_ref">validator_set::get_pending_validator_ref</a>(&self.validators, validator_address)
 }
 </code></pre>
 

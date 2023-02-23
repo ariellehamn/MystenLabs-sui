@@ -295,6 +295,10 @@ module sui::validator {
         self.metadata.sui_address
     }
 
+    public fun network_address(self: &Validator): vector<u8> {
+        self.metadata.net_address
+    }
+
     public fun total_stake_amount(self: &Validator): u64 {
         spec {
             // TODO: this should be provable rather than assumed
@@ -356,6 +360,13 @@ module sui::validator {
             || self.metadata.net_address == other.metadata.net_address
             || self.metadata.pubkey_bytes == other.metadata.pubkey_bytes
     }
+
+    // ==== Validator Metadata Management Functions ====
+
+    /// Update network address of this validator, called only from validator_set
+    public(friend) fun update_network_address(self: &mut Validator, net_address: vector<u8>) {
+        self.metadata.net_address = net_address;
+    } 
 
     // CAUTION: THIS CODE IS ONLY FOR TESTING AND THIS MACRO MUST NEVER EVER BE REMOVED.
     // Creates a validator - bypassing the proof of possession in check in the process.

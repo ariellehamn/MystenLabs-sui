@@ -398,6 +398,13 @@ module sui::validator_set {
         option::is_some(&find_validator(&self.active_validators, validator_address))
     }
 
+    /// Returns true iff `validator_address` is a member of the pending validators.
+    public(friend) fun is_pending_validator(
+        self: &ValidatorSet,
+        validator_address: address,
+    ): bool {
+        option::is_some(&find_validator(&self.pending_validators, validator_address))
+    }
 
     // ==== private helpers ====
 
@@ -458,6 +465,19 @@ module sui::validator_set {
         vector::borrow_mut(validators, validator_index)
     }
 
+    fun get_active_or_pending_validator_mut(
+        // validators: &mut vector<Validator>,
+        self: &mut ValidatorSet,
+        validator_address: address,
+    ): &mut Validator {
+        let validator_index_opt = find_validator(&self.active_validators, validator_address);
+        if option::is_some(&validator_index_opt) {
+            return vector::borrow_mut(&self.ac, validator_index);
+        }
+        let validator_index = option::extract(&mut validator_index_opt);
+        option::some(vector::borrow_mut(validators, validator_index))
+    }
+
     fun get_validator_ref(
         validators: &vector<Validator>,
         validator_address: address,
@@ -466,6 +486,26 @@ module sui::validator_set {
         assert!(option::is_some(&validator_index_opt), 0);
         let validator_index = option::extract(&mut validator_index_opt);
         vector::borrow(validators, validator_index)
+    }
+
+    public fun get_active_validator_ref(
+        self: &ValidatorSet,
+        validator_address: address,
+    ): &Validator {
+        let validator_index_opt = find_validator(&self.active_validators, validator_address);
+        assert!(option::is_some(&validator_index_opt), 0);
+        let validator_index = option::extract(&mut validator_index_opt);
+        vector::borrow(&self.active_validators, validator_index)
+    }
+
+    public fun get_pending_validator_ref(
+        self: &ValidatorSet,
+        validator_address: address,
+    ): &Validator {
+        let validator_index_opt = find_validator(&self.pending_validators, validator_address);
+        assert!(option::is_some(&validator_index_opt), 0);
+        let validator_index = option::extract(&mut validator_index_opt);
+        vector::borrow(&self.pending_validators, validator_index)
     }
 
     /// Process the pending withdraw requests. For each pending request, the validator
@@ -843,6 +883,35 @@ module sui::validator_set {
     /// Return the active validators in `self`
     public fun active_validators(self: &ValidatorSet): &vector<Validator> {
         &self.active_validators
+    }
+
+    /// Called by `sui_system`, to update an validator's network address.
+    public(friend) fun update_network_address(
+        self: &mut ValidatorSet,
+        network_address: vector<u8>,
+        ctx: &TxContext,
+    ) {
+        let validator_address = tx_context::sender(ctx);
+        let validators_opt = option::some(self.active_validators)
+            if is_active_validator(self, validator_address)
+            else (
+                option::some(self.pending_validators)
+                if is_active_validator(self, validator_address)
+                else option::none()
+            );
+        assert!(option::is_some(&validator_index_opt), 0);
+        let validator_index = option::extract(&mut validator_index_opt);        
+
+            /// Returns true iff `validator_address` is a member of the active validators.
+    public(friend) fun is_active_validator(
+        self: &ValidatorSet,
+        validator_address: address,
+    ): bool {
+        option::is_some(&find_validator(&self.active_validators, validator_address))
+    }
+
+        let validator = get_validator_mut(&mut self.active_validators, validator_address);
+        validator::update_network_address(validator, network_address);
     }
 
     #[test_only]

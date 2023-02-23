@@ -10,6 +10,7 @@ module sui::sui_system_tests {
     use sui::test_scenario::{Self, Scenario};
     use sui::governance_test_utils::{advance_epoch, set_up_sui_system_state};
     use sui::sui_system::{Self, SuiSystemState};
+    use sui::validator::Self;
     use sui::vec_set;
 
     #[test]
@@ -92,6 +93,26 @@ module sui::sui_system_tests {
         let res = vec_set::into_keys(sui_system::get_reporters_of(&system_state, addr));
         test_scenario::return_shared(system_state);
         res
+    }
+
+    #[test]
+    fun test_validator_update_metadata() {
+        let scenario_val = test_scenario::begin(@0x0);
+        let scenario = &mut scenario_val;
+
+        // Set up SuiSystemState with validator @0x1
+        set_up_sui_system_state(vector[@0x1], scenario);
+        let system_state = test_scenario::take_shared<SuiSystemState>(scenario);
+        let val = sui_system::active_validator_by_address(&system_state, @0x1);
+        assert!(validator::network_address(val) == x"FFFF", 0);
+
+        test_scenario::next_tx(scenario, @0x1);
+        let ctx = test_scenario::ctx(scenario);
+        sui_system.update_network_address
+        // sui_system::undo_report_validator(&mut system_state, reported, ctx);
+        test_scenario::return_shared(system_state);
+
+        test_scenario::end(scenario_val);
     }
 
 }
