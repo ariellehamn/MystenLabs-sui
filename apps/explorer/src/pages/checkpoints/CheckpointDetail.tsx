@@ -31,29 +31,19 @@ function CheckpointDetail() {
         async () => await rpc.getCheckpoint(digest!)
     );
 
-    // const txQuery = useQuery(
-    //     ['checkpoint-transactions'],
-    //     async () =>
-    //         // todo: replace this with `sui_getTransactions` call when we are
-    //         // able to query by checkpoint digest
-    //         await rpc.getTransactionWithEffectsBatch(checkpoint.transactions),
-    //     { enabled: !!checkpoint?.transactions?.length }
-    // );
+    const txQuery = useQuery(
+        ['checkpoint-transactions'],
+        async () =>
+            // todo: replace this with `sui_getTransactions` call when we are
+            // able to query by checkpoint digest
+            await rpc.getTransactionWithEffectsBatch(checkpoint.transactions),
+        { enabled: checkpointQuery.isFetched }
+    );
 
-    // // todo: loading/error states
-    // if (checkpointsLoading || txQuery.isLoading) {
-    //     return <div>loading...</div>;
-    // }
-
-    // if (txQuery.isError) {
-    //     return <div>error</div>;
-    // }
-
-    // const { sequenceNumber, epoch, timestampMs, epochRollingGasCostSummary } =
-    //     checkpoint;
+    console.log(txQuery.data);
 
     // // todo: this is placeholder data
-    // const txDataForTable = txQuery.data?.map((tx) => ({
+    // const txTableData = txQuery.data?.map((tx) => ({
     //     From: tx.certificate.data.sender,
     //     To: Object.values(txQuery.data[0].certificate.data.transactions[0])[0]
     //         .recipients[0],
@@ -78,7 +68,7 @@ function CheckpointDetail() {
     if (checkpointQuery.isError)
         return (
             <Banner variant="error" fullWidth>
-                There was an issue retrieving checkpoint {id}
+                There was an issue retrieving data for checkpoint: {digest}
             </Banner>
         );
 
@@ -98,7 +88,7 @@ function CheckpointDetail() {
                     </TabList>
                     <TabPanels>
                         <dl className="mt-4 space-y-2">
-                            <div className="space-y-2 sm:grid sm:grid-cols-4 sm:gap-4 sm:space-y-0">
+                            <div className="space-y-2 sm:grid sm:grid-cols-5 sm:gap-4 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -162,34 +152,68 @@ function CheckpointDetail() {
                         <Tab>Gas & Storage Fee</Tab>
                     </TabList>
                     <TabPanels>
-                        <div className="mt-4 max-w-md space-y-2 overflow-auto">
-                            <div className="grid grid-cols-2">
-                                <Text color="steel-darker" variant="p1/medium">
-                                    Computation Fee
-                                </Text>
-                                <Text color="steel-darker" variant="p1/medium">
-                                    {
-                                        epochRollingGasCostSummary.computation_cost
-                                    }
-                                </Text>
+                        <dl className="mt-4 space-y-2">
+                            <div className="space-y-2 sm:grid sm:grid-cols-5 sm:gap-4 sm:space-y-0">
+                                <dt>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        Computation Fee
+                                    </Text>
+                                </dt>
+                                <dd>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        {
+                                            epochRollingGasCostSummary.computation_cost
+                                        }
+                                    </Text>
+                                </dd>
                             </div>
-                            <div className="grid grid-cols-2">
-                                <Text color="steel-darker" variant="p1/medium">
-                                    Storage Fee
-                                </Text>
-                                <Text color="steel-darker" variant="p1/medium">
-                                    {epochRollingGasCostSummary.storage_cost}
-                                </Text>
+                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                                <dt>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        Storage Fee
+                                    </Text>
+                                </dt>
+                                <dd>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        {
+                                            epochRollingGasCostSummary.storage_cost
+                                        }
+                                    </Text>
+                                </dd>
                             </div>
-                            <div className="grid grid-cols-2">
-                                <Text color="steel-darker" variant="p1/medium">
-                                    Storage Rebate
-                                </Text>
-                                <Text color="steel-darker" variant="p1/medium">
-                                    {epochRollingGasCostSummary.storage_rebate}
-                                </Text>
+                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                                <dt>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        Storage Rebate
+                                    </Text>
+                                </dt>
+                                <dd>
+                                    <Text
+                                        color="steel-darker"
+                                        variant="p1/medium"
+                                    >
+                                        {
+                                            epochRollingGasCostSummary.storage_rebate
+                                        }
+                                    </Text>
+                                </dd>
                             </div>
-                        </div>
+                        </dl>
                     </TabPanels>
                 </TabGroup>
 
