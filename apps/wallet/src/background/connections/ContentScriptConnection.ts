@@ -3,6 +3,7 @@
 
 import Browser from 'webextension-polyfill';
 
+import FeatureGating from '../FeatureGating';
 import NetworkEnv from '../NetworkEnv';
 import { Window } from '../Window';
 import { Connection } from './Connection';
@@ -21,6 +22,7 @@ import {
 } from '_payloads/transactions';
 import Permissions from '_src/background/Permissions';
 import Transactions from '_src/background/Transactions';
+import { FEATURES } from '_src/shared/experimentation/features';
 
 import type {
     SignedTransaction,
@@ -95,13 +97,26 @@ export class ContentScriptConnection extends Connection {
                     this.permissionReply(permission, msg.id);
                 }
             } else if (isExecuteTransactionRequest(payload)) {
+                const accountForTransaction =
+                    (payload.transaction.type === 'v2' &&
+                        payload.transaction.account) ||
+                    undefined;
+                if (
+                    (await FeatureGating.getGrowthBook()).isOn(
+                        FEATURES.WALLET_MULTI_ACCOUNTS
+                    ) &&
+                    !accountForTransaction
+                ) {
+                    // throw an error to avoid executing a transaction with the wrong account in cases
+                    // where the user has multiple accounts connected but the selected in the dapp
+                    // is different from the selected/active in the wallet
+                    throw new Error('Missing account for transaction.');
+                }
                 const allowed = await Permissions.hasPermissions(
                     this.origin,
                     ['viewAccount', 'suggestTransactions'],
                     null,
-                    (payload.transaction.type === 'v2' &&
-                        payload.transaction.account) ||
-                        undefined
+                    accountForTransaction
                 );
                 if (allowed) {
                     const result = await Transactions.executeOrSignTransaction(
@@ -121,6 +136,17 @@ export class ContentScriptConnection extends Connection {
                     this.sendNotAllowedError(msg.id);
                 }
             } else if (isSignTransactionRequest(payload)) {
+                if (
+                    (await FeatureGating.getGrowthBook()).isOn(
+                        FEATURES.WALLET_MULTI_ACCOUNTS
+                    ) &&
+                    !payload.transaction.account
+                ) {
+                    // throw an error to avoid signing a transaction with the wrong account in cases
+                    // where the user has multiple accounts connected but the selected in the dapp
+                    // is different from the selected/active in the wallet
+                    throw new Error('Missing account for transaction.');
+                }
                 const allowed = await Permissions.hasPermissions(
                     this.origin,
                     ['viewAccount', 'suggestTransactions'],
