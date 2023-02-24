@@ -12,6 +12,7 @@ module sui::sui_system_tests {
     use sui::sui_system::{Self, SuiSystemState};
     use sui::validator::Self;
     use sui::vec_set;
+    use std::option::Self;
 
     #[test]
     fun test_report_validator() {
@@ -102,17 +103,25 @@ module sui::sui_system_tests {
 
         // Set up SuiSystemState with validator @0x1
         set_up_sui_system_state(vector[@0x1], scenario);
+        test_scenario::next_tx(scenario, @0x1);
         let system_state = test_scenario::take_shared<SuiSystemState>(scenario);
         let val = sui_system::active_validator_by_address(&system_state, @0x1);
+
+        // Default network address is x"FFFF"
         assert!(validator::network_address(val) == x"FFFF", 0);
+        assert!(option::is_none(&validator::next_epoch_network_address(val)), 0);
 
         test_scenario::next_tx(scenario, @0x1);
         let ctx = test_scenario::ctx(scenario);
-        sui_system.update_network_address
-        // sui_system::undo_report_validator(&mut system_state, reported, ctx);
-        test_scenario::return_shared(system_state);
+        // Update to x"6666"
+        sui_system::update_network_address(&mut system_state, x"6666", ctx);
 
+        let val = sui_system::active_validator_by_address(&system_state, @0x1);
+        // Verify the update succeeded
+        assert!(validator::network_address(val) == x"FFFF", 0);
+        assert!(option::extract(&mut validator::next_epoch_network_address(val)) == x"6666", 0);
+
+        test_scenario::return_shared(system_state);
         test_scenario::end(scenario_val);
     }
-
 }

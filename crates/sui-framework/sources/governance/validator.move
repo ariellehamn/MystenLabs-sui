@@ -12,7 +12,7 @@ module sui::validator {
     use sui::stake;
     use sui::stake::Stake;
     use sui::epoch_time_lock::EpochTimeLock;
-    use std::option::Option;
+    use std::option::{Option, Self};
     use sui::bls12381::bls12381_min_sig_verify_with_domain;
     use sui::staking_pool::{Self, Delegation, PoolTokenExchangeRate, StakedSui, StakingPool};
     use std::string::{Self, String};
@@ -36,7 +36,7 @@ module sui::validator {
         sui_address: address,
         /// The public key bytes corresponding to the private key that the validator
         /// holds to sign transactions. For now, this is the same as AuthorityName.
-        pubkey_bytes: vector<u8>,
+        protocol_pubkey_bytes: vector<u8>,
         /// The public key bytes corresponding to the private key that the validator
         /// uses to establish TLS connections
         network_pubkey_bytes: vector<u8>,
@@ -55,6 +55,8 @@ module sui::validator {
         consensus_address: vector<u8>,
         /// The address of the narwhal worker
         worker_address: vector<u8>,
+
+
         /// Total amount of validator stake that would be active in the next epoch.
         next_epoch_stake: u64,
         /// Total amount of delegated stake that would be active in the next epoch.
@@ -63,6 +65,17 @@ module sui::validator {
         next_epoch_gas_price: u64,
         /// The commission rate of the validator starting the next epoch, in basis point.
         next_epoch_commission_rate: u64,
+
+        /// "next_epoch" metadata only takes effects in the next epoch.
+        /// If none, current value will stay unchanged.
+        
+        next_epoch_protocol_pubkey_bytes: Option<vector<u8>>,
+        next_epoch_network_pubkey_bytes: Option<vector<u8>>,
+        next_epoch_worker_pubkey_bytes: Option<vector<u8>>,
+        next_epoch_proof_of_possession: Option<vector<u8>>,
+        next_epoch_net_address: Option<vector<u8>>,
+        next_epoch_consensus_address: Option<vector<u8>>,
+        next_epoch_worker_address: Option<vector<u8>>,
     }
 
     struct Validator has store {
@@ -91,23 +104,23 @@ module sui::validator {
     fun verify_proof_of_possession(
         proof_of_possession: vector<u8>,
         sui_address: address,
-        pubkey_bytes: vector<u8>
+        protocol_pubkey_bytes: vector<u8>
     ) {
         // The proof of possession is the signature over ValidatorPK || AccountAddress.
         // This proves that the account address is owned by the holder of ValidatorPK, and ensures
         // that PK exists.
-        let signed_bytes = pubkey_bytes;
+        let signed_bytes = protocol_pubkey_bytes;
         let address_bytes = bcs::to_bytes(&sui_address);
         vector::append(&mut signed_bytes, address_bytes);
         assert!(
-            bls12381_min_sig_verify_with_domain(&proof_of_possession, &pubkey_bytes, signed_bytes, PROOF_OF_POSSESSION_DOMAIN) == true,
+            bls12381_min_sig_verify_with_domain(&proof_of_possession, &protocol_pubkey_bytes, signed_bytes, PROOF_OF_POSSESSION_DOMAIN) == true,
             0
         );
     }
 
     public(friend) fun new(
         sui_address: address,
-        pubkey_bytes: vector<u8>,
+        protocol_pubkey_bytes: vector<u8>,
         network_pubkey_bytes: vector<u8>,
         worker_pubkey_bytes: vector<u8>,
         proof_of_possession: vector<u8>,
@@ -129,20 +142,20 @@ module sui::validator {
             vector::length(&net_address) <= 128
                 && vector::length(&name) <= 128
                 && vector::length(&description) <= 150
-                && vector::length(&pubkey_bytes) <= 128,
+                && vector::length(&protocol_pubkey_bytes) <= 128,
             0
         );
         verify_proof_of_possession(
             proof_of_possession,
             sui_address,
-            pubkey_bytes
+            protocol_pubkey_bytes
         );
         let stake_amount = balance::value(&stake);
         stake::create(stake, sui_address, coin_locked_until_epoch, ctx);
         Validator {
             metadata: ValidatorMetadata {
                 sui_address,
-                pubkey_bytes,
+                protocol_pubkey_bytes,
                 network_pubkey_bytes,
                 worker_pubkey_bytes,
                 proof_of_possession,
@@ -157,6 +170,13 @@ module sui::validator {
                 next_epoch_delegation: 0,
                 next_epoch_gas_price: gas_price,
                 next_epoch_commission_rate: commission_rate,
+                next_epoch_protocol_pubkey_bytes: option::none(),
+                next_epoch_network_pubkey_bytes: option::none(),
+                next_epoch_worker_pubkey_bytes: option::none(),
+                next_epoch_proof_of_possession: option::none(),
+                next_epoch_net_address: option::none(),
+                next_epoch_consensus_address: option::none(),
+                next_epoch_worker_address: option::none(),
             },
             // Initialize the voting power to be the same as the stake amount.
             // At the epoch change where this validator is actually added to the
@@ -299,6 +319,50 @@ module sui::validator {
         self.metadata.net_address
     }
 
+    public fun consensus_address(self: &Validator): vector<u8> {
+        self.metadata.consensus_address
+    }
+
+    public fun protocol_pubkey_bytes(self: &Validator): vector<u8> {
+        self.metadata.protocol_pubkey_bytes
+    }
+
+    public fun proof_of_possession(self: &Validator): vector<u8> {
+        self.metadata.proof_of_possession
+    }
+
+    public fun network_pubkey_bytes(self: &Validator): vector<u8> {
+        self.metadata.network_pubkey_bytes
+    }
+
+    public fun worker_pubkey_bytes(self: &Validator): vector<u8> {
+        self.metadata.worker_pubkey_bytes
+    }
+
+    public fun next_epoch_network_address(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_net_address
+    }
+
+    public fun next_epoch_consensus_address(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_consensus_address
+    }
+
+    public fun next_epoch_protocol_pubkey_bytes(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_protocol_pubkey_bytes
+    }
+
+    public fun next_epoch_proof_of_possession(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_proof_of_possession
+    }
+
+    public fun next_epoch_network_pubkey_bytes(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_network_pubkey_bytes
+    }
+
+    public fun next_epoch_worker_pubkey_bytes(self: &Validator): Option<vector<u8>> {
+        self.metadata.next_epoch_worker_pubkey_bytes
+    }
+
     public fun total_stake_amount(self: &Validator): u64 {
         spec {
             // TODO: this should be provable rather than assumed
@@ -358,14 +422,36 @@ module sui::validator {
          self.metadata.sui_address == other.metadata.sui_address
             || self.metadata.name == other.metadata.name
             || self.metadata.net_address == other.metadata.net_address
-            || self.metadata.pubkey_bytes == other.metadata.pubkey_bytes
+            || self.metadata.protocol_pubkey_bytes == other.metadata.protocol_pubkey_bytes
     }
 
     // ==== Validator Metadata Management Functions ====
 
-    /// Update network address of this validator, called only from validator_set
+    /// Update network address of this validator, taking effects from next epoch
     public(friend) fun update_network_address(self: &mut Validator, net_address: vector<u8>) {
-        self.metadata.net_address = net_address;
+        self.metadata.next_epoch_net_address = option::some(net_address);
+    } 
+
+    /// Update consensus address of this validator, taking effects from next epoch
+    public(friend) fun update_consensus_address(self: &mut Validator, consensus_address: vector<u8>) {
+        self.metadata.next_epoch_consensus_address = option::some(consensus_address);
+    }
+
+    /// Update protocol public key of this validator, taking effects from next epoch
+    public(friend) fun update_protocol_pubkey(self: &mut Validator, protocol_pubkey: vector<u8>, proof_of_possession: vector<u8>) {
+        verify_proof_of_possession(proof_of_possession, self.metadata.sui_address, protocol_pubkey);
+        self.metadata.next_epoch_protocol_pubkey_bytes = option::some(protocol_pubkey);
+        self.metadata.next_epoch_proof_of_possession = option::some(proof_of_possession);
+    } 
+
+    /// Update network public key of this validator, taking effects from next epoch
+    public(friend) fun update_network_pubkey(self: &mut Validator, network_pubkey: vector<u8>) {
+        self.metadata.next_epoch_network_pubkey_bytes = option::some(network_pubkey);
+    }
+
+    /// Update Narwhal worker public key of this validator, taking effects from next epoch
+    public(friend) fun update_worker_key(self: &mut Validator, worker_pubkey: vector<u8>) {
+        self.metadata.next_epoch_worker_pubkey_bytes = option::some(worker_pubkey);
     } 
 
     // CAUTION: THIS CODE IS ONLY FOR TESTING AND THIS MACRO MUST NEVER EVER BE REMOVED.
@@ -374,7 +460,7 @@ module sui::validator {
     #[test_only]
     public(friend) fun new_for_testing(
         sui_address: address,
-        pubkey_bytes: vector<u8>,
+        protocol_pubkey_bytes: vector<u8>,
         network_pubkey_bytes: vector<u8>,
         worker_pubkey_bytes: vector<u8>,
         proof_of_possession: vector<u8>,
@@ -396,7 +482,7 @@ module sui::validator {
             vector::length(&net_address) <= 128
                 && vector::length(&name) <= 128
                 && vector::length(&description) <= 150
-                && vector::length(&pubkey_bytes) <= 128,
+                && vector::length(&protocol_pubkey_bytes) <= 128,
             0
         );
         let stake_amount = balance::value(&stake);
@@ -404,7 +490,7 @@ module sui::validator {
         Validator {
             metadata: ValidatorMetadata {
                 sui_address,
-                pubkey_bytes,
+                protocol_pubkey_bytes,
                 network_pubkey_bytes,
                 worker_pubkey_bytes,
                 proof_of_possession,
@@ -419,6 +505,13 @@ module sui::validator {
                 next_epoch_delegation: 0,
                 next_epoch_gas_price: gas_price,
                 next_epoch_commission_rate: commission_rate,
+                next_epoch_protocol_pubkey_bytes: option::none(),
+                next_epoch_network_pubkey_bytes: option::none(),
+                next_epoch_worker_pubkey_bytes: option::none(),
+                next_epoch_proof_of_possession: option::none(),
+                next_epoch_net_address: option::none(),
+                next_epoch_consensus_address: option::none(),
+                next_epoch_worker_address: option::none(),
             },
             stake_amount,
             voting_power: stake_amount,

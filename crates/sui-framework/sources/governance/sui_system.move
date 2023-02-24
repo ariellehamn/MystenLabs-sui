@@ -411,10 +411,10 @@ module sui::sui_system {
         network_address: vector<u8>,
         ctx: &TxContext,
     ) {
-        let sender = tx_context::sender(ctx);
-        if (validator_set::is_active_validator(&self.validators, sender)) {
-            validator_set::update_network_address(&mut self.validators, network_address, ctx);
-        }
+        // let sender = tx_context::sender(ctx);
+        let validator = validator_set::get_active_or_pending_validator_mut(&mut self.validators, ctx);
+        validator::update_network_address(validator, network_address);
+        // validator_set::update_network_address(&mut self.validators, network_address, ctx);
     }
 
     /// This function should be called at the end of an epoch, and advances the system to the next epoch.

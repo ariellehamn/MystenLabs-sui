@@ -156,7 +156,8 @@ module sui::validator_tests {
         test_scenario::next_tx(scenario, sender);
         {
             validator::update_network_address(&mut validator, x"6666");
-            assert!(validator::network_address(&validator) ==  x"6666", 0);
+            assert!(validator::network_address(&validator) ==  x"FFFF", 0);
+            assert!(option::extract(&mut validator::next_epoch_network_address(&validator)) ==  x"6666", 0);
         };
 
         validator::destroy(validator, test_scenario::ctx(scenario));

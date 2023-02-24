@@ -465,17 +465,20 @@ module sui::validator_set {
         vector::borrow_mut(validators, validator_index)
     }
 
-    fun get_active_or_pending_validator_mut(
-        // validators: &mut vector<Validator>,
+    public(friend) fun get_active_or_pending_validator_mut(
         self: &mut ValidatorSet,
-        validator_address: address,
+        ctx: &TxContext,
     ): &mut Validator {
+        let validator_address = tx_context::sender(ctx);
+
         let validator_index_opt = find_validator(&self.active_validators, validator_address);
-        if option::is_some(&validator_index_opt) {
-            return vector::borrow_mut(&self.ac, validator_index);
-        }
+        if (option::is_some(&validator_index_opt)) {
+            let validator_index = option::extract(&mut validator_index_opt);
+            return vector::borrow_mut(&mut self.active_validators, validator_index)
+        };
+        let validator_index_opt = find_validator(&self.pending_validators, validator_address);
         let validator_index = option::extract(&mut validator_index_opt);
-        option::some(vector::borrow_mut(validators, validator_index))
+        return vector::borrow_mut(&mut self.pending_validators, validator_index)
     }
 
     fun get_validator_ref(
@@ -883,35 +886,6 @@ module sui::validator_set {
     /// Return the active validators in `self`
     public fun active_validators(self: &ValidatorSet): &vector<Validator> {
         &self.active_validators
-    }
-
-    /// Called by `sui_system`, to update an validator's network address.
-    public(friend) fun update_network_address(
-        self: &mut ValidatorSet,
-        network_address: vector<u8>,
-        ctx: &TxContext,
-    ) {
-        let validator_address = tx_context::sender(ctx);
-        let validators_opt = option::some(self.active_validators)
-            if is_active_validator(self, validator_address)
-            else (
-                option::some(self.pending_validators)
-                if is_active_validator(self, validator_address)
-                else option::none()
-            );
-        assert!(option::is_some(&validator_index_opt), 0);
-        let validator_index = option::extract(&mut validator_index_opt);        
-
-            /// Returns true iff `validator_address` is a member of the active validators.
-    public(friend) fun is_active_validator(
-        self: &ValidatorSet,
-        validator_address: address,
-    ): bool {
-        option::is_some(&find_validator(&self.active_validators, validator_address))
-    }
-
-        let validator = get_validator_mut(&mut self.active_validators, validator_address);
-        validator::update_network_address(validator, network_address);
     }
 
     #[test_only]

@@ -975,7 +975,10 @@ The change will only take effects starting from the next epoch.
     network_address: <a href="">vector</a>&lt;u8&gt;,
     ctx: &TxContext,
 ) {
-    <a href="validator_set.md#0x2_validator_set_update_network_address">validator_set::update_network_address</a>(&<b>mut</b> self.validators, network_address, ctx);
+    // <b>let</b> sender = <a href="tx_context.md#0x2_tx_context_sender">tx_context::sender</a>(ctx);
+    <b>let</b> <a href="validator.md#0x2_validator">validator</a> = <a href="validator_set.md#0x2_validator_set_get_active_or_pending_validator_mut">validator_set::get_active_or_pending_validator_mut</a>(&<b>mut</b> self.validators, ctx);
+    <a href="validator.md#0x2_validator_update_network_address">validator::update_network_address</a>(<a href="validator.md#0x2_validator">validator</a>, network_address);
+    // validator_set::update_network_address(&<b>mut</b> self.validators, network_address, ctx);
 }
 </code></pre>
 
