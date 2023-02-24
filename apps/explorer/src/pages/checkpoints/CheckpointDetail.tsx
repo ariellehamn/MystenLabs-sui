@@ -1,16 +1,15 @@
 // Copyright (c) Mysten Labs, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-import {
-    useFeature,
-    FeaturesReady,
-    useGrowthBook,
-} from '@growthbook/growthbook-react';
-import { type TransactionKindName } from '@mysten/sui.js';
+import { useFeature, useGrowthBook } from '@growthbook/growthbook-react';
 import { useQuery } from '@tanstack/react-query';
 import { Navigate, useParams } from 'react-router-dom';
 
-import { genTableDataFromTxData } from '~/components/transaction-card/TxCardUtils';
+import {
+    genTableDataFromTxData,
+    getDataOnTxDigests,
+    type TxnData,
+} from '~/components/transaction-card/TxCardUtils';
 import { useRpc } from '~/hooks/useRpc';
 import { Banner } from '~/ui/Banner';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
@@ -31,37 +30,19 @@ function CheckpointDetail() {
         async () => await rpc.getCheckpoint(digest!)
     );
 
-    const txQuery = useQuery(
+    const { data: transactions } = useQuery(
         ['checkpoint-transactions'],
-        async () =>
+        async () => {
             // todo: replace this with `sui_getTransactions` call when we are
             // able to query by checkpoint digest
-            await rpc.getTransactionWithEffectsBatch(checkpoint.transactions),
+            const txData = await getDataOnTxDigests(
+                rpc,
+                checkpointQuery.data?.transactions!
+            );
+            return genTableDataFromTxData(txData as TxnData[]);
+        },
         { enabled: checkpointQuery.isFetched }
     );
-
-    console.log(txQuery.data);
-
-    // // todo: this is placeholder data
-    // const txTableData = txQuery.data?.map((tx) => ({
-    //     From: tx.certificate.data.sender,
-    //     To: Object.values(txQuery.data[0].certificate.data.transactions[0])[0]
-    //         .recipients[0],
-    //     txId: tx.certificate.transactionDigest,
-    //     status: 'success' as 'success' | 'failure',
-    //     txGas:
-    //         tx.effects.gasUsed.computationCost +
-    //         tx.effects.gasUsed.storageCost -
-    //         tx.effects.gasUsed.storageRebate,
-    //     suiAmount: 0,
-    //     coinType: 'sui',
-    //     kind: Object.keys(
-    //         txQuery.data[0].certificate.data.transactions[0]
-    //     )[0] as TransactionKindName,
-    //     timestamp_ms: tx.timestamp_ms ?? Date.now(),
-    // }));
-
-    // const txTableData = genTableDataFromTxData(txDataForTable!, 10);
 
     if (!enabled) return <Navigate to="/" />;
 
@@ -81,14 +62,14 @@ function CheckpointDetail() {
     return (
         <div className="flex flex-col space-y-12">
             <PageHeader title={checkpoint.digest} type="Checkpoint" />
-            <div className="space-y-10">
+            <div className="space-y-8">
                 <TabGroup as="div" size="lg">
                     <TabList>
                         <Tab>Details</Tab>
                     </TabList>
                     <TabPanels>
-                        <dl className="mt-4 space-y-2">
-                            <div className="space-y-2 sm:grid sm:grid-cols-5 sm:gap-4 sm:space-y-0">
+                        <dl className="mt-4 space-y-3.75">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -106,7 +87,7 @@ function CheckpointDetail() {
                                     </Text>
                                 </dd>
                             </div>
-                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -124,7 +105,7 @@ function CheckpointDetail() {
                                     </Text>
                                 </dd>
                             </div>
-                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -153,7 +134,7 @@ function CheckpointDetail() {
                     </TabList>
                     <TabPanels>
                         <dl className="mt-4 space-y-2">
-                            <div className="space-y-2 sm:grid sm:grid-cols-5 sm:gap-4 sm:space-y-0">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -173,7 +154,7 @@ function CheckpointDetail() {
                                     </Text>
                                 </dd>
                             </div>
-                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -193,7 +174,7 @@ function CheckpointDetail() {
                                     </Text>
                                 </dd>
                             </div>
-                            <div className="sm:grid sm:grid-cols-5 sm:gap-4">
+                            <div className="space-y-1 sm:grid sm:grid-cols-5 sm:space-y-0">
                                 <dt>
                                     <Text
                                         color="steel-darker"
@@ -223,10 +204,12 @@ function CheckpointDetail() {
                     </TabList>
                     <TabPanels>
                         <div className="mt-4">
-                            {/* <TableCard
-                                data={txTableData.data}
-                                columns={txTableData.columns}
-                            /> */}
+                            {transactions?.data ? (
+                                <TableCard
+                                    data={transactions?.data}
+                                    columns={transactions?.columns}
+                                />
+                            ) : null}
                         </div>
                     </TabPanels>
                 </TabGroup>
