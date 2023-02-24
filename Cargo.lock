@@ -8685,6 +8685,7 @@ name = "sui-framework-build"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "expect-test",
  "fastcrypto",
  "move-binary-format",
  "move-bytecode-utils",
